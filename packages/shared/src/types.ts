@@ -1,14 +1,16 @@
 export type MessageType = 
   | "INSPECT_SELECTION"
   | "INSPECT_NODE_BY_NAME"
+  | "INSPECT_NODE_BY_ID"
   | "INSPECT_RESPONSE"
   | "HEARTBEAT"
   | "STATUS";
 
 export interface InspectRequest {
   id: string;
-  type: "INSPECT_SELECTION" | "INSPECT_NODE_BY_NAME";
+  type: "INSPECT_SELECTION" | "INSPECT_NODE_BY_NAME" | "INSPECT_NODE_BY_ID";
   name?: string;
+  nodeId?: string;
   exportAssets?: boolean;
 }
 

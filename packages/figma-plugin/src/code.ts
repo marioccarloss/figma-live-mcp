@@ -8,6 +8,22 @@ figma.showUI(__html__, {
   themeColors: true,
 });
 
+// Helper: Extract node ID from URL or raw ID string
+function extractNodeId(input: string): string | null {
+  const trimmed = input.trim();
+  // Check if full Figma URL: e.g. ...?node-id=123-456 or ...?node-id=123%3A456
+  const urlMatch = trimmed.match(/[?&]node-id=([^&#]+)/);
+  if (urlMatch) {
+    const rawId = decodeURIComponent(urlMatch[1]);
+    return rawId.replace(/-/g, ":");
+  }
+  // Check if raw node ID like "123:456" or "123-456"
+  if (/^\d+[:-]\d+$/.test(trimmed)) {
+    return trimmed.replace(/-/g, ":");
+  }
+  return null;
+}
+
 // Helper: Convert Figma 0..1 color to Hex string
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (n: number) => {
@@ -19,12 +35,6 @@ function rgbToHex(r: number, g: number, b: number): string {
 
 // Helper: Convert Uint8Array to base64
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  // Use btoa in UI context or custom encoder in sandbox
   return figma.base64Encode(bytes);
 }
 
@@ -39,7 +49,6 @@ function effectToCss(effect: Effect): string | undefined {
   const blur = Math.round(effect.radius);
   const spread = Math.round(effect.spread || 0);
   const color = effect.color;
-  const hex = rgbToHex(color.r, color.g, color.b);
   const alpha = Math.round(color.a * 100) / 100;
   
   return `${inset}${x}px ${y}px ${blur}px ${spread}px rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${alpha})`;
@@ -275,13 +284,13 @@ function notifySelection() {
 }
 
 figma.on("selectionchange", notifySelection);
-// Send initial selection on launch
 notifySelection();
 
 // Handle commands from MCP server through UI
 figma.ui.onmessage = async (msg) => {
   if (!msg || !msg.type) return;
 
+  // 1. Inspect active selection
   if (msg.type === "INSPECT_SELECTION") {
     const selection = figma.currentPage.selection;
     if (selection.length === 0) {
@@ -310,31 +319,98 @@ figma.ui.onmessage = async (msg) => {
         error: err?.message || String(err),
       });
     }
+    return;
   }
 
-  if (msg.type === "INSPECT_NODE_BY_NAME") {
-    const query = (msg.name || "").toLowerCase().trim();
-    if (!query) {
+  // 2. Inspect by Node ID (from URL or direct ID)
+  if (msg.type === "INSPECT_NODE_BY_ID") {
+    const targetId = (msg.nodeId || "").replace(/-/g, ":").trim();
+    const found = figma.getNodeById(targetId) as SceneNode | null;
+
+    if (!found) {
       figma.ui.postMessage({
         id: msg.id,
         type: "INSPECT_RESPONSE",
         success: false,
-        error: "Target name is empty.",
+        error: `Could not find any node with ID "${targetId}" in this file.`,
       });
       return;
     }
 
-    // First search in current page
+    // Select and center in viewport
+    figma.currentPage.selection = [found];
+    figma.viewport.scrollAndZoomIntoView([found]);
+
+    try {
+      const data = await inspectNode(found, Boolean(msg.exportAssets));
+      figma.ui.postMessage({
+        id: msg.id,
+        type: "INSPECT_RESPONSE",
+        success: true,
+        data,
+      });
+    } catch (err: any) {
+      figma.ui.postMessage({
+        id: msg.id,
+        type: "INSPECT_RESPONSE",
+        success: false,
+        error: err?.message || String(err),
+      });
+    }
+    return;
+  }
+
+  // 3. Inspect by Name OR Smart URL detection
+  if (msg.type === "INSPECT_NODE_BY_NAME") {
+    const input = (msg.name || "").trim();
+    if (!input) {
+      figma.ui.postMessage({
+        id: msg.id,
+        type: "INSPECT_RESPONSE",
+        success: false,
+        error: "Target name or URL is empty.",
+      });
+      return;
+    }
+
+    // Check if input is a Figma URL or Node ID
+    const extractedId = extractNodeId(input);
+    if (extractedId) {
+      const found = figma.getNodeById(extractedId) as SceneNode | null;
+      if (found) {
+        figma.currentPage.selection = [found];
+        figma.viewport.scrollAndZoomIntoView([found]);
+
+        try {
+          const data = await inspectNode(found, Boolean(msg.exportAssets));
+          figma.ui.postMessage({
+            id: msg.id,
+            type: "INSPECT_RESPONSE",
+            success: true,
+            data,
+          });
+        } catch (err: any) {
+          figma.ui.postMessage({
+            id: msg.id,
+            type: "INSPECT_RESPONSE",
+            success: false,
+            error: err?.message || String(err),
+          });
+        }
+        return;
+      }
+    }
+
+    // Fallback: search by name
+    const query = input.toLowerCase();
     let found: SceneNode | null = figma.currentPage.findOne((n) =>
       n.name.toLowerCase().includes(query)
     );
 
-    // If not found in current page, search all pages
     if (!found) {
       for (const page of figma.root.children) {
         found = page.findOne((n) => n.name.toLowerCase().includes(query));
         if (found) {
-          // Switch to page and select
           await figma.setCurrentPageAsync(page);
           break;
         }
@@ -346,12 +422,11 @@ figma.ui.onmessage = async (msg) => {
         id: msg.id,
         type: "INSPECT_RESPONSE",
         success: false,
-        error: `Could not find any layer or frame matching "${msg.name}".`,
+        error: `Could not find any layer or frame matching "${input}".`,
       });
       return;
     }
 
-    // Select the found node in canvas so user sees it
     figma.currentPage.selection = [found];
     figma.viewport.scrollAndZoomIntoView([found]);
 
