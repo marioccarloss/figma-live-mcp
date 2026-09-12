@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Figma Live Bridge</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --card-bg: #2d2d2d;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --red: #ef4444;
+      --border: #3f3f46;
+    }
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      user-select: none;
+      box-sizing: border-box;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title {
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s;
+    }
+    .dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .card-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .node-name {
+      font-weight: 600;
+      color: #60a5fa;
+      word-break: break-all;
+    }
+    .node-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .footer {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">⚡ Live Bridge</div>
+    <div class="status-badge">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Active Selection</div>
+    <div class="node-name" id="selectedNodeName">No selection</div>
+    <div class="node-meta" id="selectedNodeMeta">Select a frame or element in Figma</div>
+  </div>
+
+  <div class="footer">
+    WebSocket: ws://127.0.0.1:4567
+  </div>
+
+  <script>
+    const WS_URL = "ws://127.0.0.1:4567";
+    let socket = null;
+    let reconnectTimer = null;
+
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const selectedNodeName = document.getElementById("selectedNodeName");
+    const selectedNodeMeta = document.getElementById("selectedNodeMeta");
+
+    function updateStatus(connected) {
+      if (connected) {
+        statusDot.classList.add("connected");
+        statusText.textContent = "Live";
+        statusText.style.color = "var(--green)";
+      } else {
+        statusDot.classList.remove("connected");
+        statusText.textContent = "Reconnecting...";
+        statusText.style.color = "var(--text-muted)";
+      }
+    }
+
+    function connect() {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
+
+      try {
+        socket = new WebSocket(WS_URL);
+
+        socket.onopen = () => {
+          updateStatus(true);
+          if (reconnectTimer) {
+            clearInterval(reconnectTimer);
+            reconnectTimer = null;
+          }
+          // Notify server of connection
+          socket.send(JSON.stringify({ type: "PLUGIN_CONNECTED" }));
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            // Forward request to Figma plugin sandbox (code.ts)
+            parent.postMessage({ pluginMessage: data }, "*");
+          } catch (err) {
+            console.error("Failed to parse message from MCP server:", err);
+          }
+        };
+
+        socket.onclose = () => {
+          updateStatus(false);
+          scheduleReconnect();
+        };
+
+        socket.onerror = () => {
+          updateStatus(false);
+        };
+      } catch (e) {
+        updateStatus(false);
+        scheduleReconnect();
+      }
+    }
+
+    function scheduleReconnect() {
+      if (!reconnectTimer) {
+        reconnectTimer = setInterval(connect, 2000);
+      }
+    }
+
+    // Handle responses from Figma plugin sandbox (code.ts)
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === "SELECTION_CHANGED") {
+        if (msg.node) {
+          selectedNodeName.textContent = msg.node.name;
+          selectedNodeMeta.textContent = `${msg.node.type} • ${Math.round(msg.node.width)}x${Math.round(msg.node.height)}px`;
+        } else {
+          selectedNodeName.textContent = "No selection";
+          selectedNodeMeta.textContent = "Select a frame or element in Figma";
+        }
+        return;
+      }
+
+      // Forward response to MCP server
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(msg));
+      }
+    };
+
+    // Initial connection
+    connect();
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "@figma-live-mcp/figma-plugin",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "bun run build.ts"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.138.0"
+  }
+}

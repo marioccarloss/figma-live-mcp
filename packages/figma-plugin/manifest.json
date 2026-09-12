@@ -1,0 +1,16 @@
+{
+  "name": "Figma Live Bridge",
+  "id": "figma-live-bridge-local",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma", "dev"],
+  "networkAccess": {
+    "allowedDomains": [
+      "http://127.0.0.1:*",
+      "ws://127.0.0.1:*",
+      "http://localhost:*",
+      "ws://localhost:*"
+    ]
+  }
+}

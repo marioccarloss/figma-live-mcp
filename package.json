@@ -1,0 +1,23 @@
+{
+  "name": "figma-live-mcp-root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun run --cwd packages/figma-plugin build && bun run --cwd packages/mcp-server build",
+    "start": "bun run packages/mcp-server/src/index.ts",
+    "build:plugin": "bun run --cwd packages/figma-plugin build",
+    "build:server": "bun run --cwd packages/mcp-server build",
+    "compile": "bun build packages/mcp-server/src/index.ts --compile --outfile dist/figma-live-mcp"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.138.0",
+    "@types/node": "^22.13.9",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}
