@@ -82,7 +82,7 @@ echo "$(pwd)/dist/figma-live-mcp"
 3. Selecciona `figma-live-mcp/packages/figma-plugin/manifest.json`.
 4. Lanza el plugin: **Plugins** → **Development** → **Figma Live Bridge**.
 
-Se abre una ventanita con un indicador de estado. Mientras el servidor MCP no esté corriendo aparecerá como desconectado; es normal.
+Se abre una ventanita con un indicador de estado. Mientras el servidor MCP no esté corriendo aparecerá como desconectado; es normal: reintenta solo cada 2 segundos.
 
 > El plugin tiene que estar **abierto** en el archivo de Figma que quieras inspeccionar. Si cierras el plugin o cambias de archivo, vuelve a lanzarlo.
 
@@ -136,6 +136,23 @@ Cualquier cliente MCP vale: es un servidor **stdio** cuyo comando es la ruta al 
 
 ## 6. Uso diario
 
+### Qué arranca solo y qué no
+
+| Pieza | ¿Arranca sola? | Detalle |
+|---|---|---|
+| Servidor MCP (`figma-live-mcp`) | **Sí** | Lo lanza tu agente al abrir sesión, porque está en su config MCP. Abre `ws://localhost:4567` y se cierra al cerrar la sesión. |
+| Plugin de Figma | **No** | Figma no ejecuta plugins automáticamente al abrir un archivo. Lánzalo en cada archivo: **⌥⌘P** (*Run last plugin*, `Ctrl+Alt+P` en Windows) o **Plugins → Development → Figma Live Bridge**. |
+
+El orden da igual: el plugin reintenta la conexión cada 2 segundos, así que si lo abres antes que el agente se conecta solo cuando el servidor arranca.
+
+Rutina diaria:
+
+1. Abre el archivo de Figma y pulsa **⌥⌘P**.
+2. Abre tu agente en la carpeta del proyecto.
+3. Selecciona algo en Figma (o copia un "Copy link to selection") y pide lo que necesites.
+
+> Solo puede haber **una** sesión del agente con este MCP a la vez (el puerto 4567 es único). Una segunda sesión fallará al arrancar el MCP con `Connection closed`.
+
 ### Herramientas disponibles
 
 | Herramienta | Qué hace |
@@ -176,7 +193,7 @@ Parámetros comunes:
 |---|---|---|
 | El plugin aparece desconectado | El servidor MCP no está corriendo | Abre/reinicia tu agente (es quien arranca el servidor) y vuelve a lanzar el plugin. |
 | El agente dice `Connection closed` o el MCP falla al arrancar | **Otro proceso ya ocupa el puerto 4567** (p. ej. otra sesión del agente abierta) | Solo puede haber **un** servidor a la vez. Mira quién lo usa: `lsof -iTCP:4567 -sTCP:LISTEN` y cierra esa sesión o `kill <PID>`. |
-| `figma_status` dice no conectado aunque el plugin esté abierto | El plugin se lanzó antes que el servidor y no reconectó | Cierra y vuelve a lanzar el plugin en Figma. |
+| `figma_status` dice no conectado aunque el plugin esté abierto | El plugin reintenta cada 2 s; si sigue desconectado, el servidor no está escuchando en 4567 | Comprueba `lsof -iTCP:4567 -sTCP:LISTEN`. Si no hay nada, reinicia el agente. Si hay otro proceso, ver la fila de `Connection closed`. |
 | No encuentra un nodo por nombre | El nombre no coincide o está en otra página/archivo | Usa la URL de "Copy link to selection". |
 | Los assets aparecen en otra carpeta | `assets_dir` es relativo al directorio del agente | Arranca el agente en la raíz del proyecto o pasa una ruta concreta. |
 | `Import plugin from manifest` no aparece | Estás en Figma Web | Usa Figma Desktop. |
