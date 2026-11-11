@@ -75,6 +75,7 @@ export interface FigmaRawNodeData {
   typography: TypographyItem[];
   assets: ExportedAsset[];
   childrenCount: number;
+  children?: FigmaRawNodeData[];
 }
 
 export interface InspectResponse {
@@ -86,10 +87,12 @@ export interface InspectResponse {
 }
 
 /**
- * Super-compact token summary designed specifically to consume minimal LLM tokens (< 250 tokens)
+ * Compact token summary for one layer and its complete descendant hierarchy.
  */
 export interface CleanTokenSummary {
+  id: string;
   component: string;
+  type: string;
   dimensions: { width: number; height: number };
   layout: {
     display: "flex" | "block";
@@ -113,4 +116,5 @@ export interface CleanTokenSummary {
     color: string;
   }>;
   savedAssets: string[];
+  children: CleanTokenSummary[];
 }

@@ -108,11 +108,11 @@
   </div>
 
   <div class="footer">
-    WebSocket: ws://127.0.0.1:4567
+    WebSocket: ws://localhost:4567
   </div>
 
   <script>
-    const WS_URL = "ws://127.0.0.1:4567";
+    const WS_URL = "ws://localhost:4567";
     let socket = null;
     let reconnectTimer = null;
 
@@ -164,8 +164,10 @@
           scheduleReconnect();
         };
 
-        socket.onerror = () => {
+        socket.onerror = (event) => {
           updateStatus(false);
+          statusText.textContent = "Blocked / error";
+          console.error("Figma Live Bridge WebSocket error", event);
         };
       } catch (e) {
         updateStatus(false);
@@ -183,6 +185,15 @@
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
       if (!msg) return;
+
+      if (msg.type === "DUMP_CSS") {
+        fetch("http://localhost:4568/dump", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(msg.tree),
+        }).catch((err) => console.error("DUMP_CSS failed", err));
+        return;
+      }
 
       if (msg.type === "SELECTION_CHANGED") {
         if (msg.node) {

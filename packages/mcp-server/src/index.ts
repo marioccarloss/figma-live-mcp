@@ -15,7 +15,7 @@ const server = new McpServer({
 // Tool 1: Inspect currently selected node in Figma
 server.tool(
   "figma_get_selected",
-  "Inspects the currently selected element in Figma in real-time. Extracts exact layout (flex/padding/gap), colors, typography, borders, and optionally exports icons (SVG) and images (PNG) directly to disk.",
+  "Inspects the selected Figma layer and every nested descendant, preserving their hierarchy, layout, colors, typography and borders. Optionally exports icons (SVG) and images (PNG) to disk.",
   {
     export_assets: z
       .boolean()
@@ -51,7 +51,7 @@ server.tool(
       // 1. Save assets to project disk if any were exported
       const savedAssets = await saveAssetsToDisk(response.data.assets, assets_dir);
 
-      // 2. Prune AST to minimal token footprint (< 250 tokens)
+      // 2. Compact each layer while preserving the complete hierarchy
       const cleanSummary = pruneFigmaNode(response.data, savedAssets);
 
       return {

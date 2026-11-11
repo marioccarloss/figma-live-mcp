@@ -24,15 +24,88 @@ class FigmaBridgeWebSocketServer {
   public start() {
     if (this.server) return;
 
+    const self = this;
     this.server = Bun.serve<ClientData>({
       port: this.port,
-      fetch(req, server) {
-        // Upgrade incoming HTTP request to WebSocket
+      async fetch(req, server) {
+        if (req.method === "OPTIONS") {
+          return new Response(null, {
+            status: 204,
+            headers: {
+              "Access-Control-Allow-Origin": req.headers.get("Origin") || "*",
+              "Access-Control-Allow-Private-Network": "true",
+              "Access-Control-Allow-Headers": "*",
+              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            },
+          });
+        }
+        const url = new URL(req.url);
+        if (url.pathname === "/inspect") {
+          try {
+            const data = await self.sendRequest({
+              id: crypto.randomUUID(),
+              type: "INSPECT_SELECTION",
+              exportAssets: false,
+            });
+            return Response.json(data, {
+              headers: {
+                "Access-Control-Allow-Origin": "*",
+              },
+            });
+          } catch (err: any) {
+            return Response.json(
+              { success: false, error: err?.message || String(err) },
+              {
+                status: 500,
+                headers: { "Access-Control-Allow-Origin": "*" },
+              }
+            );
+          }
+        }
+        if (url.pathname === "/find") {
+          const name = url.searchParams.get("name") || "";
+          try {
+            const data = await self.sendRequest({
+              id: crypto.randomUUID(),
+              type: "INSPECT_NODE_BY_NAME",
+              name,
+              exportAssets: false,
+            });
+            return Response.json(data, {
+              headers: { "Access-Control-Allow-Origin": "*", },
+            });
+          } catch (err: any) {
+            return Response.json(
+              { success: false, error: err?.message || String(err) },
+              {
+                status: 500,
+                headers: { "Access-Control-Allow-Origin": "*" },
+              }
+            );
+          }
+        }
+        if (url.pathname === "/status") {
+          return Response.json(
+            {
+              connected: self.isConnected(),
+              activeClients: self.getClientCount(),
+            },
+            {
+              headers: { "Access-Control-Allow-Origin": "*" },
+            }
+          );
+        }
         const success = server.upgrade(req, {
           data: { id: crypto.randomUUID() },
         });
         if (success) return undefined;
-        return new Response("Figma Live Bridge WebSocket Server Running", { status: 200 });
+        return new Response("Figma Live Bridge WebSocket Server Running", {
+          status: 200,
+          headers: {
+            "Access-Control-Allow-Origin": req.headers.get("Origin") || "*",
+            "Access-Control-Allow-Private-Network": "true",
+          },
+        });
       },
       websocket: {
         open: (ws) => {

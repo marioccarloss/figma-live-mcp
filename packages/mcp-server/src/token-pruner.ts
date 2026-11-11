@@ -95,11 +95,14 @@ export function pruneFigmaNode(
   }
 
   return {
+    id: raw.id,
     component: raw.name,
+    type: raw.type,
     dimensions: { width: raw.width, height: raw.height },
     layout,
     visuals,
     typography,
     savedAssets,
+    children: (raw.children ?? []).map((child) => pruneFigmaNode(child)),
   };
 }

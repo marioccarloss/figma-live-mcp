@@ -7,10 +7,10 @@
   "editorType": ["figma", "dev"],
   "networkAccess": {
     "allowedDomains": [
-      "http://127.0.0.1:*",
-      "ws://127.0.0.1:*",
-      "http://localhost:*",
-      "ws://localhost:*"
-    ]
+      "http://localhost:4567",
+      "ws://localhost:4567",
+      "http://localhost:4568"
+    ],
+    "reasoning": "The plugin UI opens a WebSocket to the local Figma Live Bridge MCP server on port 4567."
   }
 }

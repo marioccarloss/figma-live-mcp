@@ -54,7 +54,7 @@ function effectToCss(effect: Effect): string | undefined {
   return `${inset}${x}px ${y}px ${blur}px ${spread}px rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${alpha})`;
 }
 
-// Recursively collect text items inside a node
+// Collect text on this layer; descendants are inspected separately.
 function extractTypography(node: SceneNode): any[] {
   const items: any[] = [];
 
@@ -85,12 +85,6 @@ function extractTypography(node: SceneNode): any[] {
       lineHeightPx,
       colorHex,
     });
-  }
-
-  if ("children" in node) {
-    for (const child of (node as ChildrenMixin).children) {
-      items.push(...extractTypography(child));
-    }
   }
 
   return items;
@@ -239,7 +233,12 @@ async function inspectNode(node: SceneNode, exportAssets: boolean = false): Prom
   // Export vector assets and images
   const assets = await extractAssets(node, exportAssets);
 
-  const childrenCount = "children" in node ? (node as ChildrenMixin).children.length : 0;
+  const children = [];
+  if ("children" in node) {
+    for (const child of (node as ChildrenMixin).children) {
+      children.push(await inspectNode(child));
+    }
+  }
 
   return {
     id: node.id,
@@ -256,8 +255,50 @@ async function inspectNode(node: SceneNode, exportAssets: boolean = false): Prom
     },
     typography,
     assets,
-    childrenCount,
+    childrenCount: children.length,
+    children,
   };
+}
+
+function cssFill(node: SceneNode): string | undefined {
+  if (!("fills" in node) || node.fills === figma.mixed || !Array.isArray(node.fills)) return undefined;
+  const fill = node.fills.find((f) => f.visible !== false && f.type === "SOLID") as SolidPaint | undefined;
+  return fill ? rgbToHex(fill.color.r, fill.color.g, fill.color.b) : undefined;
+}
+
+function dumpCssTree(node: SceneNode, depth = 0): any {
+  const item: any = {
+    name: node.name,
+    type: node.type,
+    w: Math.round(node.width),
+    h: Math.round(node.height),
+  };
+  const fill = cssFill(node);
+  if (fill) item.fill = fill;
+  if ("layoutMode" in node && (node as FrameNode).layoutMode !== "NONE") {
+    const f = node as FrameNode;
+    item.flex = f.layoutMode === "HORIZONTAL" ? "row" : "column";
+    if (f.itemSpacing) item.gap = Math.round(f.itemSpacing);
+    const pad = [Math.round(f.paddingTop), Math.round(f.paddingRight), Math.round(f.paddingBottom), Math.round(f.paddingLeft)];
+    if (pad.some((v) => v)) item.pad = pad;
+  }
+  if (node.type === "TEXT") {
+    const t = node as TextNode;
+    const fontName = t.fontName !== figma.mixed ? t.fontName : { family: "?", style: "?" };
+    item.text = t.characters.slice(0, 80);
+    item.font = `${fontName.family} ${fontName.style}`;
+    item.size = t.fontSize !== figma.mixed ? Math.round(t.fontSize as number) : undefined;
+    if (t.lineHeight !== figma.mixed && typeof t.lineHeight === "object" && t.lineHeight.unit === "PIXELS") {
+      item.lh = Math.round(t.lineHeight.value);
+    }
+    item.color = cssFill(t);
+  }
+  if (depth < 7 && "children" in node) {
+    const kids = (node as ChildrenMixin).children;
+    item.kids = kids.slice(0, 24).map((c) => dumpCssTree(c, depth + 1));
+    if (kids.length > 24) item.more = kids.length - 24;
+  }
+  return item;
 }
 
 // Broadcast selection change to UI
@@ -305,6 +346,10 @@ figma.ui.onmessage = async (msg) => {
 
     try {
       const data = await inspectNode(selection[0], Boolean(msg.exportAssets));
+      figma.ui.postMessage({
+        type: "DUMP_CSS",
+        tree: dumpCssTree(selection[0]),
+      });
       figma.ui.postMessage({
         id: msg.id,
         type: "INSPECT_RESPONSE",
