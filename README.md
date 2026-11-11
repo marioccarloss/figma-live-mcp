@@ -31,11 +31,14 @@ figma-live-mcp/
 
 ## 🛠️ 1-Minute Setup
 
+> 📘 Step-by-step installation and usage guide (Spanish): [docs/INSTALL.md](docs/INSTALL.md)
+
 ### 1. Load the Plugin in Figma
 
 1. Open Figma (Desktop app or Web).
 2. Go to **Menu (F)** → **Plugins** → **Development** → **Import plugin from manifest...**
 3. Select `packages/figma-plugin/manifest.json` from this repository.
+   Figma rejects IPs (`127.0.0.1`) and `:*` wildcards in `allowedDomains`. Local plugins use `allowedDomains: ["none"]` plus `devAllowedDomains: ["http://localhost:4567"]`.
 4. Run the plugin (**Plugins** → **Development** → **Figma Live Bridge**).
    * A small window will appear with a live status indicator showing the active selection.
 
@@ -51,19 +54,19 @@ Add to your Antigravity MCP settings or sidecar configuration:
 {
   "mcpServers": {
     "figma-live": {
-      "command": "/Users/roca/Documents/figma-live-mcp/dist/figma-live-mcp"
+      "command": "/Users/[user]/Documents/figma-live-mcp/dist/figma-live-mcp"
     }
   }
 }
 ```
-*(Or use `bun run /Users/roca/Documents/figma-live-mcp/packages/mcp-server/src/index.ts`)*
+*(Or use `bun run /Users/[user]/Documents/figma-live-mcp/packages/mcp-server/src/index.ts`)*
 
 #### B. In Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`)
 ```json
 {
   "mcpServers": {
     "figma-live": {
-      "command": "/Users/roca/Documents/figma-live-mcp/dist/figma-live-mcp"
+      "command": "/Users/[user]/Documents/figma-live-mcp/dist/figma-live-mcp"
     }
   }
 }
@@ -72,7 +75,7 @@ Add to your Antigravity MCP settings or sidecar configuration:
 #### C. In Claude Code / OpenCode / Codex
 Run or configure:
 ```bash
-claude mcp add figma-live /Users/roca/Documents/figma-live-mcp/dist/figma-live-mcp
+claude mcp add figma-live /Users/[user]/Documents/figma-live-mcp/dist/figma-live-mcp
 ```
 
 ---
