@@ -153,6 +153,30 @@ Rutina diaria:
 
 > Solo puede haber **una** sesión del agente con este MCP a la vez (el puerto 4567 es único). Una segunda sesión fallará al arrancar el MCP con `Connection closed`.
 
+### El plugin muestra "Reconnecting…"
+
+Significa que **no hay ningún servidor MCP escuchando en el puerto 4567**. El agente **no puede arrancar un MCP por sí mismo** a mitad de conversación: hay que reconectarlo desde el cliente.
+
+1. Comprueba el puerto: `lsof -iTCP:4567 -sTCP:LISTEN`
+   - **Vacío**: el MCP de tu sesión no arrancó o se cayó (típico si al abrir la sesión el puerto lo tenía otra sesión que ya se cerró). Pasa al paso 2.
+   - **Hay un proceso**: otra sesión del agente tiene el MCP. Trabaja en esa sesión, o ciérrala (o `kill <PID>`) y pasa al paso 2.
+2. Reconecta el MCP en el chat donde estás trabajando:
+   - **Claude Code**: escribe `/mcp`, selecciona `figma-live` y pulsa **Reconnect**.
+   - **Claude Desktop / Codex / Cursor / otros**: reinicia la sesión (o la app) para que vuelva a lanzar el servidor.
+3. En unos 2 segundos el plugin pasa a conectado solo. Pide al agente *"comprueba figma_status"* para confirmarlo.
+
+### Instrucción para tu agente (opcional)
+
+Para que el agente te avise en lugar de fallar en silencio, añade esto a tu `CLAUDE.md` / `AGENTS.md`:
+
+```markdown
+## Figma Live Bridge MCP
+- Before using Figma data, call `figma_status`. If the `figma-live` tools are missing, fail, or report the plugin as disconnected, stop and tell me:
+  1. Run `lsof -iTCP:4567 -sTCP:LISTEN`. If another process holds the port, show its PID and command and ask before killing it.
+  2. Ask me to reconnect the MCP (`/mcp` → figma-live → Reconnect in Claude Code; restart the session in other clients) and to run the "Figma Live Bridge" plugin in Figma (⌥⌘P).
+- Never guess design values when the bridge is disconnected.
+```
+
 ### Herramientas disponibles
 
 | Herramienta | Qué hace |
